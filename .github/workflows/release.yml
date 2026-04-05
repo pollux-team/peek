@@ -49,6 +49,6 @@ jobs:
           releaseBody: "See the assets to download and install this version."
           releaseDraft: false
           prerelease: false
-          uploadUpdaterJson: true
-          uploadUpdaterSignatures: true
+          includeUpdaterJson: true # Changed from uploadUpdaterJson
+          # uploadUpdaterSignatures removed  (Not a valid input in v0.6.2)
           updaterJsonPreferNsis: true
