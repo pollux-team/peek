@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "peek",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.peek.stats",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -16,7 +16,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJENzM2QjFFRjIxMkJGNDEKUldSQnZ4THlIbXR6TGVvTFpzaDZGYjZjcE1CSUVlZndCZ0I0dmdQeXhoaEt6d1FTTnBqMmU2MjAK",
       "endpoints": [
-        "https://raw.githubusercontent.com/pollux-team/peek/main/latest.json"
+        "https://github.com/pollux-team/peek/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
@@ -81,7 +81,17 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  }
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "publisher": "Noman Dhoni"
 }
