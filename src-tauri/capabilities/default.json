@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main", "overlay"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "sql:default",
+    "sql:allow-execute",
+    "core:window:allow-minimize",
+    "core:window:allow-hide"
+  ]
+}

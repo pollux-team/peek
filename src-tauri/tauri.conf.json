@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "peek",
+  "version": "0.1.0",
+  "identifier": "com.peek.stats",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "plugins": {
+    "sql": {
+      "preload": ["sqlite:overlay.db"]
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJENzM2QjFFRjIxMkJGNDEKUldSQnZ4THlIbXR6TGVvTFpzaDZGYjZjcE1CSUVlZndCZ0I0dmdQeXhoaEt6d1FTTnBqMmU2MjAK",
+      "endpoints": [
+        "https://raw.githubusercontent.com/nomandhoni-cs/peek/main/updater.json"
+      ]
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "peek",
+        "visible": false,
+        "width": 420,
+        "height": 620,
+        "minWidth": 420,
+        "minHeight": 620,
+        "maxWidth": 420,
+        "maxHeight": 620,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": true,
+        "closable": true,
+        "fullscreen": false,
+        "focus": true,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": false
+      },
+      {
+        "label": "overlay",
+        "title": "peek-overlay",
+        "visible": false,
+        "url": "/overlay",
+        "width": 350,
+        "minWidth": 350,
+        "height": 40,
+        "minHeight": 40,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "focus": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
