@@ -13,12 +13,18 @@ jobs:
     runs-on: blacksmith-4vcpu-windows-2025
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -31,16 +37,18 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Build and Release Tauri app
-        uses: tauri-apps/tauri-action@v0
+      - name: Build and publish Tauri app
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # These secrets must be added in your GitHub Repo Settings!
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: peek-v__VERSION__ # Action automatically replaces with app version
-          releaseName: "Peek v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: true
+          tagName: v__VERSION__
+          releaseName: "peek v__VERSION__"
+          releaseBody: "See the assets to download and install this version."
+          releaseDraft: false
           prerelease: false
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          updaterJsonPreferNsis: true
