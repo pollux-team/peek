@@ -10,12 +10,14 @@ export default function Overlay() {
   const [cpu, setCpu] = useState<string>("—");
   const [gpu, setGpu] = useState<string>("—");
   const [ram, setRam] = useState<string>("—");
+  const [isLocked, setIsLocked] = useState<boolean>(false);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let unlistenTray: UnlistenFn | null = null;
     let unlistenMove: UnlistenFn | null = null;
     let unlistenReset: UnlistenFn | null = null;
+    let unlistenLock: UnlistenFn | null = null;
     let timeoutId: ReturnType<typeof setTimeout>;
 
     // 1. Stats Listener
@@ -60,12 +62,17 @@ export default function Overlay() {
     }).then((fn) => (unlisten = fn));
 
     // 2. Tray Events
-    listen("tray-rect", () => {}).then((fn) => (unlistenTray = fn));
+    listen("tray-rect", () => { }).then((fn) => (unlistenTray = fn));
+
+    // 3. Lock Changed Event
+    listen<boolean>("lock-changed", (evt) => {
+      setIsLocked(evt.payload);
+    }).then((fn) => (unlistenLock = fn));
 
     const dynamicImport = (s: string) =>
       new Function("s", "return import(s)")(s);
 
-    // 3. Reset Event
+    // 4. Reset Event
     listen("overlay-reset", async () => {
       try {
         const dbModule = await dynamicImport("@tauri-apps/plugin-sql").catch(
@@ -78,14 +85,18 @@ export default function Overlay() {
         } else {
           try {
             await invoke("clear_saved_overlay_position");
-          } catch (e) {}
+          } catch (e) { }
         }
-      } catch (e) {}
+      } catch (e) { }
     }).then((fn) => (unlistenReset = fn));
 
-    // 4. Initialization (Load position)
+    // 5. Initialization (Load position and lock state)
     (async () => {
       try {
+        // Check lock state from Rust
+        const locked = await invoke<boolean>("is_overlay_locked");
+        setIsLocked(locked);
+
         const dbModule = await dynamicImport("@tauri-apps/plugin-sql").catch(
           () => null,
         );
@@ -114,6 +125,7 @@ export default function Overlay() {
               width: Number(r.width),
               height: Number(r.height),
               manual,
+              locked,
             });
           }
         } else {
@@ -134,22 +146,30 @@ export default function Overlay() {
               width: Number(cfg.width),
               height: Number(cfg.height),
               manual: Boolean(cfg.manual),
+              locked: Boolean(cfg.locked),
             });
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
 
-    // 5. Window Move Listener (Fixes the Drop & Remember state bug, AND ensures it stays on top)
+    // 6. Window Move Listener (only saves if not locked)
     getCurrentWindow()
       .onMoved(async () => {
+        // If locked, don't save position changes
+        if (isLocked) return;
+
         // Force the window to stay on top while dragging
         try {
           await invoke("force_topmost");
-        } catch (e) {}
+        } catch (e) { }
 
         clearTimeout(timeoutId);
         timeoutId = setTimeout(async () => {
+          // Double-check lock state before saving
+          const currentLocked = await invoke<boolean>("is_overlay_locked");
+          if (currentLocked) return;
+
           try {
             const w = getCurrentWindow();
             const pos = await w.outerPosition();
@@ -176,6 +196,7 @@ export default function Overlay() {
               width: size.width,
               height: size.height,
               manual: true,
+              locked: false,
             });
             await invoke("set_overlay_state", {
               x: pos.x,
@@ -183,23 +204,25 @@ export default function Overlay() {
               width: size.width,
               height: size.height,
               manual: true,
+              locked: false,
             });
-          } catch (e) {}
+          } catch (e) { }
         }, 500); // 500ms debounce
       })
       .then((fn) => (unlistenMove = fn));
 
     // Call topmost immediately on mount
-    invoke("force_topmost").catch(() => {});
+    invoke("force_topmost").catch(() => { });
 
     return () => {
       if (unlisten) unlisten();
       if (unlistenTray) unlistenTray();
       if (unlistenReset) unlistenReset();
       if (unlistenMove) unlistenMove();
+      if (unlistenLock) unlistenLock();
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [isLocked]);
 
   return (
     <div className="overlay-root" data-tauri-drag-region>

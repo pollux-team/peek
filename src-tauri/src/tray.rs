@@ -1,8 +1,8 @@
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::image::Image as TauriImage;
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder};
+use tauri::path::BaseDirectory;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Emitter;
 use tauri::Manager;
@@ -14,6 +14,9 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
     let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
     let reset_overlay =
         MenuItemBuilder::with_id("reset-overlay", "Reset Overlay Position").build(app)?;
+    let lock_overlay = CheckMenuItemBuilder::with_id("lock-overlay", "Lock Overlay Position")
+        .checked(false)
+        .build(app)?;
 
     let show_hide = MenuItemBuilder::with_id("toggle-window", "Show").build(app)?;
 
@@ -23,8 +26,14 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
         }
     }
 
+    // Check if overlay is locked from saved config
+    if let Some(cfg) = crate::config::OverlayConfig::load() {
+        let _ = lock_overlay.set_checked(cfg.locked);
+        crate::overlay_state::set_overlay(cfg);
+    }
+
     let menu = MenuBuilder::new(app)
-        .items(&[&toggle, &show_hide, &reset_overlay, &quit])
+        .items(&[&toggle, &show_hide, &lock_overlay, &reset_overlay, &quit])
         .build()?;
 
     if let Ok(enabled) = crate::autostart::is_enabled(app) {
@@ -32,12 +41,27 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
         let _ = app.emit("autostart-changed", enabled);
     }
 
-    let icon_path = PathBuf::from("icons/icon.ico");
-    let maybe_icon = if icon_path.exists() {
-        TauriImage::from_path(icon_path.clone()).ok()
-    } else {
-        TauriImage::from_path(PathBuf::from("icons/icon.png")).ok()
-    };
+    // Use Tauri's path resolver to get the correct resource path in both dev and production
+    let maybe_icon = app
+        .path()
+        .resolve("icons/icon.ico", BaseDirectory::Resource)
+        .ok()
+        .and_then(|p| TauriImage::from_path(p).ok())
+        .or_else(|| {
+            app.path()
+                .resolve("icons/icon.png", BaseDirectory::Resource)
+                .ok()
+                .and_then(|p| TauriImage::from_path(p).ok())
+        });
+
+    // Fallback: try to load from embedded bytes if file-based loading fails
+    let maybe_icon = maybe_icon.or_else(|| {
+        // Try loading the icon from the bundle's icon directory
+        app.path()
+            .resolve("icons/32x32.png", BaseDirectory::Resource)
+            .ok()
+            .and_then(|p| TauriImage::from_path(p).ok())
+    });
 
     let last_click = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1)));
     let debounce_ms = Duration::from_millis(200);
@@ -68,7 +92,10 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
                             }),
                         );
 
-                        if let Some(overlay) = app.get_webview_window("overlay") {
+                        // Check if overlay is locked before repositioning
+                        if crate::overlay_state::is_locked() {
+                            // Skip repositioning if locked
+                        } else if let Some(overlay) = app.get_webview_window("overlay") {
                             if let Some(cfg) = crate::overlay_state::get_overlay() {
                                 if cfg.manual {
                                     return;
@@ -77,7 +104,7 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
                             let tray_pos_x = position.x as i64;
                             let tray_pos_y = position.y as i64;
 
-                            const OVERLAY_TOTAL_WIDTH: i64 = 350; // Increased width
+                            const OVERLAY_TOTAL_WIDTH: i64 = 350;
                             const OVERLAY_MARGIN: i64 = 8;
 
                             let monitor_opt =
@@ -258,6 +285,7 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
             .on_menu_event({
                 let toggle = toggle.clone();
                 let show_hide = show_hide.clone();
+                let lock_overlay = lock_overlay.clone();
                 move |app, event| match event.id().as_ref() {
                     "toggle-autostart" => {
                         let app_handle = app.clone();
@@ -287,6 +315,21 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
                                     }
                                 }
                             }
+                        });
+                    }
+                    "lock-overlay" => {
+                        let app_handle = app.clone();
+                        let lock_overlay_clone = lock_overlay.clone();
+                        let is_checked = lock_overlay.is_checked().unwrap_or(false);
+                        tauri::async_runtime::spawn(async move {
+                            let new_locked = !is_checked;
+                            crate::overlay_state::set_locked(new_locked);
+                            if let Some(mut cfg) = crate::config::OverlayConfig::load() {
+                                cfg.locked = new_locked;
+                                let _ = cfg.save();
+                            }
+                            let _ = lock_overlay_clone.set_checked(new_locked);
+                            let _ = app_handle.emit_to("overlay", "lock-changed", new_locked);
                         });
                     }
                     "reset-overlay" => {
@@ -363,6 +406,7 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
             .on_menu_event({
                 let toggle = toggle.clone();
                 let show_hide = show_hide.clone();
+                let lock_overlay = lock_overlay.clone();
                 move |app, event| match event.id().as_ref() {
                     "toggle-autostart" => {
                         let app_handle = app.clone();
@@ -392,6 +436,21 @@ pub fn build_system_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::tray::T
                                     }
                                 }
                             }
+                        });
+                    }
+                    "lock-overlay" => {
+                        let app_handle = app.clone();
+                        let lock_overlay_clone = lock_overlay.clone();
+                        let is_checked = lock_overlay.is_checked().unwrap_or(false);
+                        tauri::async_runtime::spawn(async move {
+                            let new_locked = !is_checked;
+                            crate::overlay_state::set_locked(new_locked);
+                            if let Some(mut cfg) = crate::config::OverlayConfig::load() {
+                                cfg.locked = new_locked;
+                                let _ = cfg.save();
+                            }
+                            let _ = lock_overlay_clone.set_checked(new_locked);
+                            let _ = app_handle.emit_to("overlay", "lock-changed", new_locked);
                         });
                     }
                     "quit" => {

@@ -11,6 +11,8 @@ pub struct OverlayConfig {
     pub width: u32,
     pub height: u32,
     pub manual: bool,
+    #[serde(default)]
+    pub locked: bool,
 }
 
 impl OverlayConfig {

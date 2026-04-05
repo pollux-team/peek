@@ -23,6 +23,7 @@ fn save_overlay_position(
     width: u32,
     height: u32,
     manual: bool,
+    locked: bool,
 ) -> Result<(), String> {
     crate::config::OverlayConfig {
         x,
@@ -30,19 +31,35 @@ fn save_overlay_position(
         width,
         height,
         manual,
+        locked,
     }
     .save()
 }
 
 #[tauri::command]
-fn set_overlay_state(x: i32, y: i32, width: u32, height: u32, manual: bool) {
+fn set_overlay_state(x: i32, y: i32, width: u32, height: u32, manual: bool, locked: bool) {
     crate::overlay_state::set_overlay(crate::config::OverlayConfig {
         x,
         y,
         width,
         height,
         manual,
+        locked,
     });
+}
+
+#[tauri::command]
+fn set_overlay_locked(locked: bool) {
+    crate::overlay_state::set_locked(locked);
+    if let Some(mut cfg) = crate::config::OverlayConfig::load() {
+        cfg.locked = locked;
+        let _ = cfg.save();
+    }
+}
+
+#[tauri::command]
+fn is_overlay_locked() -> bool {
+    crate::overlay_state::is_locked()
 }
 
 #[tauri::command]
@@ -199,7 +216,9 @@ pub fn run() {
             is_autostart_enabled,
             set_autostart_enabled,
             enable_autostart,
-            force_topmost
+            force_topmost,
+            set_overlay_locked,
+            is_overlay_locked
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
