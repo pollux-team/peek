@@ -10,7 +10,7 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
-    runs-on: windows-latest
+    runs-on: blacksmith-4vcpu-windows-2025
 
     steps:
       - uses: actions/checkout@v4
